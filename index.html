@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>실시간 전체 채팅</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap');
+ 
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: #0d0f10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+}
+#app { width: 100%; max-width: 480px; }
+ 
+.lc-root { background:#171a1c; border-radius:14px; overflow:hidden; box-shadow:0 0 0 1px rgba(255,255,255,0.06); }
+.lc-header { padding:18px 20px; border-bottom:1px dashed #3a3d3f; display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.lc-title { color:#f2c14e; font-weight:700; font-size:15px; letter-spacing:0.5px; text-transform:uppercase; }
+.lc-room-badge { font-family:'JetBrains Mono',monospace; font-size:12px; color:#8fd6c4; background:#1f2a27; padding:4px 10px; border-radius:20px; border:1px solid #2e463f; }
+.lc-body { padding:20px; }
+.lc-label { color:#9a9d9f; font-size:12px; margin-bottom:6px; display:block; }
+.lc-input { width:100%; box-sizing:border-box; background:#0f1112; border:1px solid #3a3d3f; color:#f4f1ea; border-radius:8px; padding:10px 12px; font-size:14px; font-family:inherit; margin-bottom:14px; }
+.lc-input:focus { outline:none; border-color:#f2c14e; }
+.lc-btn { width:100%; background:#f2c14e; color:#171a1c; font-weight:700; border:none; border-radius:8px; padding:11px; font-size:14px; cursor:pointer; font-family:inherit; }
+.lc-btn:active { transform:scale(0.98); }
+.lc-msgs { height:360px; overflow-y:auto; padding:16px 20px; display:flex; flex-direction:column; gap:10px; background: repeating-linear-gradient(#171a1c, #171a1c 27px, #23272a 28px); }
+.lc-msg { max-width:78%; padding:8px 12px; border-radius:10px; font-size:13.5px; line-height:1.5; word-wrap:break-word; }
+.lc-msg.me { align-self:flex-end; background:#2e463f; color:#c9f0e2; border-bottom-right-radius:2px; }
+.lc-msg.other { align-self:flex-start; background:#2a2c2e; color:#f4f1ea; border-bottom-left-radius:2px; }
+.lc-msg .lc-name { display:block; font-size:11px; color:#8fd6c4; margin-bottom:2px; font-weight:600; }
+.lc-msg.me .lc-name { color:#f2c14e; }
+.lc-composer { display:flex; gap:8px; padding:14px 20px; border-top:1px dashed #3a3d3f; }
+.lc-composer input { flex:1; }
+.lc-composer button { width:auto; padding:10px 18px; }
+.lc-footer-link { text-align:center; padding:12px; font-size:11.5px; color:#6a6d6f; }
+.lc-empty { color:#6a6d6f; font-size:13px; text-align:center; padding:30px 0; }
+.lc-error { color:#e08a8a; font-size:12px; text-align:center; padding:10px 20px; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+ 
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, push, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+/* ===== 본인의 Firebase Realtime Database URL ===== */
+const DATABASE_URL = "https://chat-5710d-default-rtdb.firebaseio.com";
+/* ================================================= */
+
+const app = document.getElementById('app');
+let room = null;
+let name = null;
+let db = null;
+let unsubscribe = null;
+
+let configError = !DATABASE_URL || DATABASE_URL.indexOf('https://') !== 0;
+
+if (!configError) {
+  const firebaseConfig = { databaseURL: DATABASE_URL };
+  const firebaseApp = initializeApp(firebaseConfig);
+  db = getDatabase(firebaseApp);
+  
+  // [추가] 브라우저에 저장된 이전 닉네임이 있는지 확인하고 있으면 바로 방 코드로 고정합니다.
+  const savedName = localStorage.getItem('chat_nickname');
+  if (savedName) {
+    name = savedName;
+    room = "public";
+  }
+}
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+ 
+function render() {
+  if (configError) {
+    app.innerHTML = `
+      <div class="lc-root">
+        <div class="lc-header"><span class="lc-title">설정이 필요해요</span></div>
+        <div class="lc-body">
+          <p style="color:#f4f1ea;font-size:13.5px;line-height:1.6;">
+            index.html 파일 내 <code style="color:#f2c14e;">DATABASE_URL</code> 설정에 주소를 넣어주세요.
+          </p>
+        </div>
+      </div>`;
+    return;
+  }
+ 
+  if (!name) {
+    app.innerHTML = `
+      <div class="lc-root">
+        <div class="lc-header"><span class="lc-title">전체 채팅방 입장</span></div>
+        <div class="lc-body">
+          <label class="lc-label">닉네임</label>
+          <input class="lc-input" id="lc-name" placeholder="예: 지민" maxlength="12" />
+          <button class="lc-btn" id="lc-join">입장하기</button>
+        </div>
+        <div class="lc-footer-link">이름을 한 번 입력하면 이 브라우저에 자동으로 저장됩니다.</div>
+      </div>`;
+    document.getElementById('lc-join').onclick = doJoin;
+    document.getElementById('lc-name').addEventListener('keydown', e => { if (e.key === 'Enter') doJoin(); });
+    return;
+  }
+ 
+  app.innerHTML = `
+    <div class="lc-root">
+      <div class="lc-header">
+        <span class="lc-title" id="lc-user-title" style="cursor:pointer;text-decoration:underline;text-underline-offset:4px;" title="닉네임 변경하기">${escapeHtml(name)} ✎</span>
+        <span class="lc-room-badge">#전체채팅</span>
+      </div>
+      <div class="lc-msgs" id="lc-msgs"><div class="lc-empty">불러오는 중...</div></div>
+      <div class="lc-composer">
+        <input class="lc-input" id="lc-input" placeholder="메시지 입력" style="margin-bottom:0;" maxlength="500" />
+        <button class="lc-btn" id="lc-send">전송</button>
+      </div>
+    </div>
+    <div class="lc-footer-link">이름 옆의 ✎ 아이콘을 누르면 언제든지 닉네임을 변경할 수 있습니다.</div>`;
+  
+  // 닉네임 변경 기능 바인딩
+  document.getElementById('lc-user-title').onclick = changeNickname;
+  document.getElementById('lc-send').onclick = sendMsg;
+  document.getElementById('lc-input').addEventListener('keydown', e => { if (e.key === 'Enter') sendMsg(); });
+  
+  listenToMessages();
+}
+ 
+function doJoin() {
+  const n = document.getElementById('lc-name').value.trim();
+  if (!n) return;
+  name = n;
+  room = "public";
+  
+  // [추가] 입력받은 닉네임을 브라우저의 로컬 스토리지에 저장합니다.
+  localStorage.setItem('chat_nickname', n);
+  render();
+}
+
+// [추가] 닉네임 변경 함수
+function changeNickname() {
+  const newName = prompt("변경할 새로운 닉네임을 입력해 주세요:", name);
+  if (newName === null) return; // 취소 버튼을 누른 경우
+  const trimmed = newName.trim();
+  if (!trimmed) {
+    alert("올바른 닉네임을 입력해 주세요.");
+    return;
+  }
+  name = trimmed;
+  localStorage.setItem('chat_nickname', trimmed);
+  render();
+}
+ 
+function listenToMessages() {
+  if (unsubscribe) unsubscribe();
+
+  const roomRef = ref(db, `rooms/${room}`);
+  
+  unsubscribe = onValue(roomRef, (snapshot) => {
+    const data = snapshot.val();
+    const msgs = data ? Object.values(data) : [];
+    msgs.sort((a, b) => a.ts - b.ts);
+    renderMessages(msgs);
+  }, (error) => {
+    console.error("데이터 구독 실패", error);
+    renderMessages([], true);
+  });
+}
+ 
+function renderMessages(msgs, error) {
+  const el = document.getElementById('lc-msgs');
+  if (!el) return;
+  const wasAtBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 30;
+  if (error) {
+    el.innerHTML = '<div class="lc-error">데이터를 불러오지 못했습니다. 보안 규칙 설정을 확인해 주세요.</div>';
+    return;
+  }
+  if (!msgs.length) {
+    el.innerHTML = '<div class="lc-empty">아직 메시지가 없어요. 첫 대화를 시작해 보세요!</div>';
+    return;
+  }
+  el.innerHTML = msgs.map(m => `
+    <div class="lc-msg ${m.name === name ? 'me' : 'other'}">
+      <span class="lc-name">${escapeHtml(m.name)}</span>${escapeHtml(m.text)}
+    </div>`).join('');
+  if (wasAtBottom) el.scrollTop = el.scrollHeight;
+}
+ 
+async function sendMsg() {
+  const input = document.getElementById('lc-input');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  
+  try {
+    const roomRef = ref(db, `rooms/${room}`);
+    const newMsgRef = push(roomRef);
+    
+    await set(newMsgRef, {
+      name: name,
+      text: text,
+      ts: Date.now()
+    });
+  } catch (e) {
+    console.error('전송 실패', e);
+  }
+}
+ 
+render();
+</script>
+</body>
+</html>
