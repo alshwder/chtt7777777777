@@ -36,12 +36,16 @@ body {
 .lc-tab { flex:1; text-align:center; padding:12px; color:#8fd6c4; font-size:13px; font-weight:600; cursor:pointer; border-bottom:2px solid transparent; }
 .lc-tab.active { color:#f2c14e; border-bottom-color:#f2c14e; }
 
-/* 리스트 아이템 (유저/방) */
-.lc-item { display:flex; align-items:center; justify-content:space-between; padding:12px; background:#222629; border-radius:10px; margin-bottom:8px; cursor:pointer; transition:background 0.2s; }
+/* 리스트 아이템 (방/유저 목록 - 인스타 DM 스타일 알림 적용) */
+.lc-item { display:flex; align-items:center; justify-content:space-between; padding:14px 12px; background:#222629; border-radius:10px; margin-bottom:8px; cursor:pointer; transition:all 0.2s; border-left: 3px solid transparent; }
 .lc-item:hover { background:#2a2f33; }
-.lc-item-info { display:flex; flex-direction:column; gap:4px; }
-.lc-item-title { color:#f4f1ea; font-size:14px; font-weight:600; }
-.lc-item-sub { color:#9a9d9f; font-size:12px; }
+.lc-item.unread-room { background:#282e33; border-left-color:#f2c14e; } /* 새 메시지 왔을 때 하이라이트 */
+.lc-item-info { display:flex; flex-direction:column; gap:4px; flex:1; overflow:hidden; }
+.lc-item-title { color:#f4f1ea; font-size:14px; font-weight:600; display:flex; justify-content:space-between; }
+.lc-item-sub { color:#9a9d9f; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:flex; justify-content:space-between; align-items:center; }
+.lc-item-sub.bold { color:#fff; font-weight:700; }
+.lc-time { font-size:11px; color:#6a6d6f; font-family:'JetBrains Mono',monospace; font-weight:normal; }
+.lc-badge { background:#f2c14e; color:#171a1c; font-size:11px; font-weight:800; padding:2px 6px; border-radius:10px; margin-left:8px; flex-shrink:0; }
 
 /* 채팅창 스타일 */
 .lc-msgs { flex:1; overflow-y:auto; padding:16px 20px; display:flex; flex-direction:column; gap:12px; background:#131517; }
@@ -53,10 +57,12 @@ body {
 .lc-msg-wrapper.other .lc-msg { background:#2a2c2e; color:#f4f1ea; border-bottom-left-radius:2px; }
 .lc-name { font-size:11px; color:#8fd6c4; margin-bottom:4px; font-weight:600; }
 
-/* 시간 및 읽음표시 메타데이터 */
+/* 시간 및 읽음표시 */
 .lc-meta { display:flex; align-items:flex-end; gap:4px; font-size:10px; color:#6a6d6f; margin-top:4px; font-family:'JetBrains Mono',monospace; }
 .lc-msg-wrapper.me .lc-meta { flex-direction:row-reverse; }
-.lc-unread { color:#f2c14e; font-weight:bold; }
+.lc-unread { color:#f2c14e; font-weight:bold; cursor:help; }
+.lc-read-tag { color:#8fd6c4; font-weight:600; }
+.lc-seen-bar { align-self:flex-end; font-size:11px; color:#8fd6c4; margin-top:-4px; margin-bottom:4px; font-weight:600; display:flex; align-items:center; gap:4px; }
 
 .lc-composer { display:flex; gap:8px; padding:14px 20px; background:#1c2023; border-top:1px solid #2a2d2f; }
 .lc-composer input { flex:1; margin-bottom:0; }
@@ -99,7 +105,18 @@ function escapeHtml(s) {
 }
 
 function formatTime(ts) {
+  if (!ts) return '';
   return new Date(ts).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+}
+
+function formatListTime(ts) {
+  if (!ts) return '';
+  const date = new Date(ts);
+  const now = new Date();
+  if (date.toDateString() === now.toDateString()) {
+    return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+  }
+  return `${date.getMonth() + 1}월 ${date.getDate()}일`;
 }
 
 // 1. 유저 인증 및 프로필 관리
@@ -157,7 +174,7 @@ function renderLobby() {
         <button class="lc-btn lc-btn-sub" id="btn-group" style="width:auto; padding:6px 12px; font-size:12px;">+ 단체방</button>
       </div>
       <div class="lc-tabs">
-        <div class="lc-tab ${currentTab === 'rooms' ? 'active' : ''}" id="tab-rooms">채팅방</div>
+        <div class="lc-tab ${currentTab === 'rooms' ? 'active' : ''}" id="tab-rooms">채팅방 목록</div>
         <div class="lc-tab ${currentTab === 'users' ? 'active' : ''}" id="tab-users">친구 목록</div>
       </div>
       <div class="lc-body" id="lobby-content"><div class="lc-empty">불러오는 중...</div></div>
@@ -171,7 +188,6 @@ function renderLobby() {
   else loadUsers();
 }
 
-// 유저 목록 불러오기 (1:1 채팅 생성)
 function loadUsers() {
   unsubscribe = onValue(ref(db, 'users'), (snap) => {
     const users = snap.val() || {};
@@ -187,14 +203,14 @@ function loadUsers() {
             <span class="lc-item-title">${escapeHtml(u.name)}</span>
             <span class="lc-item-sub">${escapeHtml(u.status)}</span>
           </div>
-          <span style="color:#8fd6c4; font-size:12px;">1:1 대화 ➔</span>
+          <span style="color:#8fd6c4; font-size:12px; font-weight:600;">1:1 대화 ➔</span>
         </div>`;
     });
     content.innerHTML = html || '<div class="lc-empty">다른 사용자가 없습니다.</div>';
   });
 }
 
-// 채팅방 목록 불러오기
+// [핵심 업그레이드] 인스타 DM 스타일 방 목록 (미확인 메시지 및 뱃지 알림)
 function loadRooms() {
   unsubscribe = onValue(ref(db, 'rooms'), (snap) => {
     const rooms = snap.val() || {};
@@ -202,20 +218,49 @@ function loadRooms() {
     if (!content) return;
     
     let html = '';
-    Object.entries(rooms).forEach(([id, r]) => {
-      if (!r.meta || !r.meta.members || !r.meta.members[currentUser.id]) return;
-      
+    const roomList = Object.entries(rooms).filter(([id, r]) => r.meta && r.meta.members && r.meta.members[currentUser.id]);
+    
+    // 최신 메시지 순으로 정렬
+    roomList.sort((a, b) => {
+      const timeA = a[1].meta.lastMessage ? a[1].meta.lastMessage.ts : a[1].meta.createdAt;
+      const timeB = b[1].meta.lastMessage ? b[1].meta.lastMessage.ts : b[1].meta.createdAt;
+      return timeB - timeA;
+    });
+
+    roomList.forEach(([id, r]) => {
       let title = r.meta.title;
       if (r.meta.type === 'direct') {
-        const otherName = Object.values(r.meta.memberNames).find(name => name !== currentUser.name);
-        title = `${otherName || '알 수 없음'}님과의 대화`;
+        const otherName = Object.values(r.meta.memberNames || {}).find(name => name !== currentUser.name);
+        title = `${otherName || '알 수 없음'}`;
+      }
+      
+      const lastMsg = r.meta.lastMessage;
+      let previewText = "아직 대화 내역이 없습니다.";
+      let timeStr = formatListTime(r.meta.createdAt);
+      let isUnread = false;
+
+      if (lastMsg) {
+        timeStr = formatListTime(lastMsg.ts);
+        const prefix = lastMsg.senderId === currentUser.id ? "나: " : `${lastMsg.senderName}: `;
+        previewText = prefix + lastMsg.text;
+        
+        // 내가 보낸 메시지가 아니고, 내가 아직 읽은 기록(readBy)이 없다면 미확인 상태!
+        if (lastMsg.senderId !== currentUser.id && (!lastMsg.readBy || !lastMsg.readBy[currentUser.id])) {
+          isUnread = true;
+        }
       }
       
       html += `
-        <div class="lc-item" onclick="window.joinRoom('${id}')">
+        <div class="lc-item ${isUnread ? 'unread-room' : ''}" onclick="window.joinRoom('${id}')">
           <div class="lc-item-info">
-            <span class="lc-item-title">${escapeHtml(title)}</span>
-            <span class="lc-item-sub">참여자 ${Object.keys(r.meta.members).length}명</span>
+            <div class="lc-item-title">
+              <span>${escapeHtml(title)} ${r.meta.type === 'group' ? `(${Object.keys(r.meta.members).length})` : ''}</span>
+              <span class="lc-time">${timeStr}</span>
+            </div>
+            <div class="lc-item-sub ${isUnread ? 'bold' : ''}">
+              <span style="overflow:hidden; text-overflow:ellipsis;">${escapeHtml(previewText)}</span>
+              ${isUnread ? '<span class="lc-badge">N</span>' : ''}
+            </div>
           </div>
         </div>`;
     });
@@ -223,7 +268,6 @@ function loadRooms() {
   });
 }
 
-// 1:1 채팅방 생성 또는 입장
 window.startDirectChat = async (targetId, targetName) => {
   const roomsSnap = await get(ref(db, 'rooms'));
   const rooms = roomsSnap.val() || {};
@@ -246,7 +290,6 @@ window.startDirectChat = async (targetId, targetName) => {
   window.joinRoom(newRoomRef.key);
 };
 
-// 단체 채팅방 생성
 async function createGroupRoom() {
   const usersSnap = await get(ref(db, 'users'));
   const users = usersSnap.val() || {};
@@ -281,7 +324,7 @@ async function createGroupRoom() {
   window.joinRoom(newRoomRef.key);
 }
 
-// 3. 채팅방 화면 및 메시지 처리 (읽음 확인 + 3일 자동 삭제)
+// 3. 채팅방 화면 및 메시지 처리
 window.joinRoom = async (roomId) => {
   if (unsubscribe) { unsubscribe(); unsubscribe = null; }
   activeRoomId = roomId;
@@ -291,16 +334,16 @@ window.joinRoom = async (roomId) => {
   
   let displayTitle = activeRoomMeta.title;
   if (activeRoomMeta.type === 'direct') {
-    const otherName = Object.values(activeRoomMeta.memberNames).find(name => name !== currentUser.name);
-    displayTitle = `${otherName}님과의 대화`;
+    const otherName = Object.values(activeRoomMeta.memberNames || {}).find(name => name !== currentUser.name);
+    displayTitle = `${otherName || '상대방'}님과의 대화`;
   }
 
   app.innerHTML = `
     <div class="lc-root">
       <div class="lc-header">
-        <button class="lc-back-btn" id="btn-back"><span>◀</span> 나가기</button>
+        <button class="lc-back-btn" id="btn-back"><span>◀</span> 목록으로</button>
         <span class="lc-title" style="font-size:14px;">${escapeHtml(displayTitle)}</span>
-        <span style="width:40px;"></span>
+        <span style="width:50px;"></span>
       </div>
       <div class="lc-msgs" id="chat-msgs"><div class="lc-empty">메시지를 불러오는 중...</div></div>
       <div class="lc-composer">
@@ -328,11 +371,11 @@ function listenMessages() {
     const now = Date.now();
     let html = '';
     const validMsgs = [];
+    let needMetaUpdate = false;
     
-    // 3일 지난 메시지 필터링 및 클라이언트 단 자동 삭제 로직
     Object.entries(msgs).forEach(([msgId, m]) => {
       if (now - m.ts > THREE_DAYS_MS) {
-        remove(ref(db, `rooms/${activeRoomId}/messages/${msgId}`)); // 3일 경과 시 DB 삭제
+        remove(ref(db, `rooms/${activeRoomId}/messages/${msgId}`));
       } else {
         validMsgs.push({ id: msgId, ...m });
       }
@@ -341,37 +384,70 @@ function listenMessages() {
     validMsgs.sort((a, b) => a.ts - b.ts);
     
     if (validMsgs.length === 0) {
-      el.innerHTML = '<div class="lc-empty">대화 내역이 없습니다.</div>';
+      el.innerHTML = '<div class="lc-empty">대화 내역이 없습니다. 첫 메시지를 보내보세요!</div>';
       return;
     }
     
-    validMsgs.forEach(m => {
+    validMsgs.forEach((m, idx) => {
       const isMe = m.senderId === currentUser.id;
       
       // 내가 읽지 않은 메시지라면 읽음 처리 업데이트
       if (!m.readBy || !m.readBy[currentUser.id]) {
         update(ref(db, `rooms/${activeRoomId}/messages/${m.id}/readBy`), { [currentUser.id]: Date.now() });
+        if (idx === validMsgs.length - 1) needMetaUpdate = true;
       }
       
-      // 안 읽은 사람 수 계산
-      const readCount = m.readBy ? Object.keys(m.readBy).length : 0;
+      // 누가 읽었는지 이름 명단 추출
+      const readUserIds = m.readBy ? Object.keys(m.readBy) : [];
+      const readNames = readUserIds
+        .filter(id => id !== m.senderId && activeRoomMeta.memberNames && activeRoomMeta.memberNames[id])
+        .map(id => activeRoomMeta.memberNames[id]);
+        
+      const readCount = readUserIds.length;
       const unreadCount = Math.max(0, totalMembers - readCount);
-      const unreadHtml = unreadCount > 0 ? `<span class="lc-unread">${unreadCount}</span>` : '';
+      
+      // [핵심 업그레이드] 명확한 읽음 텍스트 표시
+      let readIndicatorHtml = '';
+      if (isMe) {
+        if (unreadCount > 0) {
+          // 아직 안 읽은 사람이 있으면 숫자 표시 (마우스 올리면 읽은 사람 이름 뜸)
+          readIndicatorHtml = `<span class="lc-unread" title="읽은 사람: ${readNames.join(', ') || '없음'}">${unreadCount}</span>`;
+        } else {
+          // 모두 읽었으면 '읽음' 텍스트 표시!
+          readIndicatorHtml = `<span class="lc-read-tag" title="모든 참여자가 읽었습니다.">읽음</span>`;
+        }
+      }
       
       html += `
         <div class="lc-msg-wrapper ${isMe ? 'me' : 'other'}">
           ${!isMe ? `<span class="lc-name">${escapeHtml(m.senderName)}</span>` : ''}
           <div class="lc-msg">${escapeHtml(m.text)}</div>
           <div class="lc-meta">
-            ${unreadHtml}
+            ${readIndicatorHtml}
             <span>${formatTime(m.ts)}</span>
           </div>
         </div>`;
     });
     
-    const wasAtBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 40;
+    // [핵심 업그레이드] 인스타 DM 스타일 '맨 아래 Seen(누가 읽었는지)' 상태 바 표시
+    const lastMsg = validMsgs[validMsgs.length - 1];
+    if (lastMsg && lastMsg.senderId === currentUser.id && lastMsg.readBy) {
+      const lastReadNames = Object.keys(lastMsg.readBy)
+        .filter(id => id !== currentUser.id && activeRoomMeta.memberNames && activeRoomMeta.memberNames[id])
+        .map(id => activeRoomMeta.memberNames[id]);
+      if (lastReadNames.length > 0) {
+        html += `<div class="lc-seen-bar">👁️ ${escapeHtml(lastReadNames.join(', '))}님이 읽음</div>`;
+      }
+    }
+
+    // 채팅방에 들어와서 최신 메시지를 읽었으면 방 목록의 미리보기 데이터도 읽음 처리!
+    if (needMetaUpdate && activeRoomMeta && activeRoomMeta.lastMessage) {
+      update(ref(db, `rooms/${activeRoomId}/meta/lastMessage/readBy`), { [currentUser.id]: Date.now() });
+    }
+    
+    const wasAtBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 50;
     el.innerHTML = html;
-    if (wasAtBottom || validMsgs[validMsgs.length-1].senderId === currentUser.id) {
+    if (wasAtBottom || lastMsg.senderId === currentUser.id) {
       el.scrollTop = el.scrollHeight;
     }
   });
@@ -383,13 +459,27 @@ async function sendMessage() {
   if (!text || !activeRoomId) return;
   input.value = '';
   
+  const ts = Date.now();
   const newMsgRef = push(ref(db, `rooms/${activeRoomId}/messages`));
-  await set(newMsgRef, {
+  const msgData = {
     senderId: currentUser.id,
     senderName: currentUser.name,
     text: text,
-    ts: Date.now(),
-    readBy: { [currentUser.id]: Date.now() } // 보낸 사람은 즉시 읽음 처리
+    ts: ts,
+    readBy: { [currentUser.id]: ts }
+  };
+  
+  await set(newMsgRef, msgData);
+  
+  // 방 목록(로비)에 미리보기와 안 읽음 뱃지를 띄우기 위해 meta 정보 동시 업데이트
+  await update(ref(db, `rooms/${activeRoomId}/meta`), {
+    lastMessage: {
+      text: text,
+      ts: ts,
+      senderId: currentUser.id,
+      senderName: currentUser.name,
+      readBy: { [currentUser.id]: ts }
+    }
   });
 }
 </script>
