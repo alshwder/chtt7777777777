@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>실시간 전체 채팅</title>
+<title>실시간 멀티 채팅 메신저</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap');
- 
+
 * { box-sizing: border-box; }
 body {
   margin: 0;
@@ -18,201 +18,380 @@ body {
   padding: 20px;
   font-family: 'Space Grotesk', system-ui, sans-serif;
 }
-#app { width: 100%; max-width: 480px; }
- 
-.lc-root { background:#171a1c; border-radius:14px; overflow:hidden; box-shadow:0 0 0 1px rgba(255,255,255,0.06); }
-.lc-header { padding:18px 20px; border-bottom:1px dashed #3a3d3f; display:flex; align-items:center; justify-content:space-between; gap:10px; }
-.lc-title { color:#f2c14e; font-weight:700; font-size:15px; letter-spacing:0.5px; text-transform:uppercase; }
-.lc-room-badge { font-family:'JetBrains Mono',monospace; font-size:12px; color:#8fd6c4; background:#1f2a27; padding:4px 10px; border-radius:20px; border:1px solid #2e463f; }
-.lc-body { padding:20px; }
-.lc-label { color:#9a9d9f; font-size:12px; margin-bottom:6px; display:block; }
+#app { width: 100%; max-width: 480px; height: 680px; display: flex; flex-direction: column; }
+
+.lc-root { background:#171a1c; border-radius:14px; overflow:hidden; box-shadow:0 0 0 1px rgba(255,255,255,0.06); display:flex; flex-direction:column; height:100%; }
+.lc-header { padding:16px 20px; border-bottom:1px solid #2a2d2f; display:flex; align-items:center; justify-content:space-between; background:#1c2023; }
+.lc-title { color:#f2c14e; font-weight:700; font-size:16px; display:flex; align-items:center; gap:8px; }
+.lc-body { padding:20px; flex:1; overflow-y:auto; }
+.lc-label { color:#9a9d9f; font-size:12px; margin-bottom:6px; display:block; font-weight:500; }
 .lc-input { width:100%; box-sizing:border-box; background:#0f1112; border:1px solid #3a3d3f; color:#f4f1ea; border-radius:8px; padding:10px 12px; font-size:14px; font-family:inherit; margin-bottom:14px; }
 .lc-input:focus { outline:none; border-color:#f2c14e; }
-.lc-btn { width:100%; background:#f2c14e; color:#171a1c; font-weight:700; border:none; border-radius:8px; padding:11px; font-size:14px; cursor:pointer; font-family:inherit; }
+.lc-btn { width:100%; background:#f2c14e; color:#171a1c; font-weight:700; border:none; border-radius:8px; padding:11px; font-size:14px; cursor:pointer; font-family:inherit; transition:0.1s; }
 .lc-btn:active { transform:scale(0.98); }
-.lc-msgs { height:360px; overflow-y:auto; padding:16px 20px; display:flex; flex-direction:column; gap:10px; background: repeating-linear-gradient(#171a1c, #171a1c 27px, #23272a 28px); }
-.lc-msg { max-width:78%; padding:8px 12px; border-radius:10px; font-size:13.5px; line-height:1.5; word-wrap:break-word; }
-.lc-msg.me { align-self:flex-end; background:#2e463f; color:#c9f0e2; border-bottom-right-radius:2px; }
-.lc-msg.other { align-self:flex-start; background:#2a2c2e; color:#f4f1ea; border-bottom-left-radius:2px; }
-.lc-msg .lc-name { display:block; font-size:11px; color:#8fd6c4; margin-bottom:2px; font-weight:600; }
-.lc-msg.me .lc-name { color:#f2c14e; }
-.lc-composer { display:flex; gap:8px; padding:14px 20px; border-top:1px dashed #3a3d3f; }
-.lc-composer input { flex:1; }
+.lc-btn-sub { background:#2a2c2e; color:#f4f1ea; border:1px solid #3a3d3f; }
+
+/* 탭 네비게이션 */
+.lc-tabs { display:flex; background:#1c2023; border-bottom:1px solid #2a2d2f; }
+.lc-tab { flex:1; text-align:center; padding:12px; color:#8fd6c4; font-size:13px; font-weight:600; cursor:pointer; border-bottom:2px solid transparent; }
+.lc-tab.active { color:#f2c14e; border-bottom-color:#f2c14e; }
+
+/* 리스트 아이템 (유저/방) */
+.lc-item { display:flex; align-items:center; justify-content:space-between; padding:12px; background:#222629; border-radius:10px; margin-bottom:8px; cursor:pointer; transition:background 0.2s; }
+.lc-item:hover { background:#2a2f33; }
+.lc-item-info { display:flex; flex-direction:column; gap:4px; }
+.lc-item-title { color:#f4f1ea; font-size:14px; font-weight:600; }
+.lc-item-sub { color:#9a9d9f; font-size:12px; }
+
+/* 채팅창 스타일 */
+.lc-msgs { flex:1; overflow-y:auto; padding:16px 20px; display:flex; flex-direction:column; gap:12px; background:#131517; }
+.lc-msg-wrapper { display:flex; flex-direction:column; max-width:75%; }
+.lc-msg-wrapper.me { align-self:flex-end; align-items:flex-end; }
+.lc-msg-wrapper.other { align-self:flex-start; align-items:flex-start; }
+.lc-msg { padding:10px 14px; border-radius:12px; font-size:13.5px; line-height:1.5; word-wrap:break-word; }
+.lc-msg-wrapper.me .lc-msg { background:#f2c14e; color:#171a1c; border-bottom-right-radius:2px; font-weight:500; }
+.lc-msg-wrapper.other .lc-msg { background:#2a2c2e; color:#f4f1ea; border-bottom-left-radius:2px; }
+.lc-name { font-size:11px; color:#8fd6c4; margin-bottom:4px; font-weight:600; }
+
+/* 시간 및 읽음표시 메타데이터 */
+.lc-meta { display:flex; align-items:flex-end; gap:4px; font-size:10px; color:#6a6d6f; margin-top:4px; font-family:'JetBrains Mono',monospace; }
+.lc-msg-wrapper.me .lc-meta { flex-direction:row-reverse; }
+.lc-unread { color:#f2c14e; font-weight:bold; }
+
+.lc-composer { display:flex; gap:8px; padding:14px 20px; background:#1c2023; border-top:1px solid #2a2d2f; }
+.lc-composer input { flex:1; margin-bottom:0; }
 .lc-composer button { width:auto; padding:10px 18px; }
-.lc-footer-link { text-align:center; padding:12px; font-size:11.5px; color:#6a6d6f; }
-.lc-empty { color:#6a6d6f; font-size:13px; text-align:center; padding:30px 0; }
-.lc-error { color:#e08a8a; font-size:12px; text-align:center; padding:10px 20px; }
+.lc-empty { color:#6a6d6f; font-size:13px; text-align:center; padding:40px 0; }
+.lc-back-btn { background:none; border:none; color:#f2c14e; cursor:pointer; font-size:14px; padding:0; display:flex; align-items:center; gap:4px; }
 </style>
 </head>
 <body>
 <div id="app"></div>
- 
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getDatabase, ref, push, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import { getDatabase, ref, push, set, onValue, update, remove, get } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 /* ===== 본인의 Firebase Realtime Database URL ===== */
 const DATABASE_URL = "https://chat-5710d-default-rtdb.firebaseio.com";
 /* ================================================= */
 
 const app = document.getElementById('app');
-let room = null;
-let name = null;
 let db = null;
 let unsubscribe = null;
 
-let configError = !DATABASE_URL || DATABASE_URL.indexOf('https://') !== 0;
+// 상태 관리
+let currentUser = null;
+let currentTab = 'rooms'; // 'rooms' | 'users'
+let activeRoomId = null;
+let activeRoomMeta = null;
 
-if (!configError) {
-  const firebaseConfig = { databaseURL: DATABASE_URL };
-  const firebaseApp = initializeApp(firebaseConfig);
+const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
+
+if (DATABASE_URL && DATABASE_URL.indexOf('https://') === 0) {
+  const firebaseApp = initializeApp({ databaseURL: DATABASE_URL });
   db = getDatabase(firebaseApp);
-  
-  // [추가] 브라우저에 저장된 이전 닉네임이 있는지 확인하고 있으면 바로 방 코드로 고정합니다.
-  const savedName = localStorage.getItem('chat_nickname');
-  if (savedName) {
-    name = savedName;
-    room = "public";
-  }
+  loadSavedUser();
 }
 
 function escapeHtml(s) {
-  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  return s ? s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])) : '';
 }
- 
-function render() {
-  if (configError) {
-    app.innerHTML = `
-      <div class="lc-root">
-        <div class="lc-header"><span class="lc-title">설정이 필요해요</span></div>
-        <div class="lc-body">
-          <p style="color:#f4f1ea;font-size:13.5px;line-height:1.6;">
-            index.html 파일 내 <code style="color:#f2c14e;">DATABASE_URL</code> 설정에 주소를 넣어주세요.
-          </p>
-        </div>
-      </div>`;
-    return;
+
+function formatTime(ts) {
+  return new Date(ts).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+}
+
+// 1. 유저 인증 및 프로필 관리
+async function loadSavedUser() {
+  const savedId = localStorage.getItem('chat_user_id');
+  if (savedId) {
+    const userSnap = await get(ref(db, `users/${savedId}`));
+    if (userSnap.exists()) {
+      currentUser = { id: savedId, ...userSnap.val() };
+      update(ref(db, `users/${savedId}`), { lastSeen: Date.now() });
+      renderLobby();
+      return;
+    }
   }
- 
-  if (!name) {
-    app.innerHTML = `
-      <div class="lc-root">
-        <div class="lc-header"><span class="lc-title">전체 채팅방 입장</span></div>
-        <div class="lc-body">
-          <label class="lc-label">닉네임</label>
-          <input class="lc-input" id="lc-name" placeholder="예: 지민" maxlength="12" />
-          <button class="lc-btn" id="lc-join">입장하기</button>
-        </div>
-        <div class="lc-footer-link">이름을 한 번 입력하면 이 브라우저에 자동으로 저장됩니다.</div>
-      </div>`;
-    document.getElementById('lc-join').onclick = doJoin;
-    document.getElementById('lc-name').addEventListener('keydown', e => { if (e.key === 'Enter') doJoin(); });
-    return;
-  }
- 
+  renderLogin();
+}
+
+function renderLogin() {
+  app.innerHTML = `
+    <div class="lc-root">
+      <div class="lc-header"><span class="lc-title">💬 프로필 설정</span></div>
+      <div class="lc-body" style="display:flex; flex-direction:column; justify-content:center;">
+        <label class="lc-label">닉네임 (최대 10자)</label>
+        <input class="lc-input" id="login-name" placeholder="예: 홍길동" maxlength="10" />
+        <label class="lc-label">상태 메시지</label>
+        <input class="lc-input" id="login-status" placeholder="예: 행복한 하루!" maxlength="30" />
+        <button class="lc-btn" id="login-btn">메신저 시작하기</button>
+      </div>
+    </div>`;
+  
+  document.getElementById('login-btn').onclick = async () => {
+    const name = document.getElementById('login-name').value.trim();
+    const status = document.getElementById('login-status').value.trim() || '상태 메시지가 없습니다.';
+    if (!name) return alert('닉네임을 입력해주세요.');
+    
+    const newId = 'u_' + Math.random().toString(36).substr(2, 9);
+    const userData = { name, status, lastSeen: Date.now() };
+    
+    await set(ref(db, `users/${newId}`), userData);
+    localStorage.setItem('chat_user_id', newId);
+    currentUser = { id: newId, ...userData };
+    renderLobby();
+  };
+}
+
+// 2. 로비 (채팅방 목록 & 유저 목록)
+function renderLobby() {
+  if (unsubscribe) { unsubscribe(); unsubscribe = null; }
+  activeRoomId = null;
+  
   app.innerHTML = `
     <div class="lc-root">
       <div class="lc-header">
-        <span class="lc-title" id="lc-user-title" style="cursor:pointer;text-decoration:underline;text-underline-offset:4px;" title="닉네임 변경하기">${escapeHtml(name)} ✎</span>
-        <span class="lc-room-badge">#전체채팅</span>
+        <span class="lc-title">내 프로필: ${escapeHtml(currentUser.name)}</span>
+        <button class="lc-btn lc-btn-sub" id="btn-group" style="width:auto; padding:6px 12px; font-size:12px;">+ 단체방</button>
       </div>
-      <div class="lc-msgs" id="lc-msgs"><div class="lc-empty">불러오는 중...</div></div>
-      <div class="lc-composer">
-        <input class="lc-input" id="lc-input" placeholder="메시지 입력" style="margin-bottom:0;" maxlength="500" />
-        <button class="lc-btn" id="lc-send">전송</button>
+      <div class="lc-tabs">
+        <div class="lc-tab ${currentTab === 'rooms' ? 'active' : ''}" id="tab-rooms">채팅방</div>
+        <div class="lc-tab ${currentTab === 'users' ? 'active' : ''}" id="tab-users">친구 목록</div>
       </div>
-    </div>
-    <div class="lc-footer-link">이름 옆의 ✎ 아이콘을 누르면 언제든지 닉네임을 변경할 수 있습니다.</div>`;
+      <div class="lc-body" id="lobby-content"><div class="lc-empty">불러오는 중...</div></div>
+    </div>`;
+    
+  document.getElementById('tab-rooms').onclick = () => { currentTab = 'rooms'; renderLobby(); };
+  document.getElementById('tab-users').onclick = () => { currentTab = 'users'; renderLobby(); };
+  document.getElementById('btn-group').onclick = createGroupRoom;
   
-  // 닉네임 변경 기능 바인딩
-  document.getElementById('lc-user-title').onclick = changeNickname;
-  document.getElementById('lc-send').onclick = sendMsg;
-  document.getElementById('lc-input').addEventListener('keydown', e => { if (e.key === 'Enter') sendMsg(); });
-  
-  listenToMessages();
-}
- 
-function doJoin() {
-  const n = document.getElementById('lc-name').value.trim();
-  if (!n) return;
-  name = n;
-  room = "public";
-  
-  // [추가] 입력받은 닉네임을 브라우저의 로컬 스토리지에 저장합니다.
-  localStorage.setItem('chat_nickname', n);
-  render();
+  if (currentTab === 'rooms') loadRooms();
+  else loadUsers();
 }
 
-// [추가] 닉네임 변경 함수
-function changeNickname() {
-  const newName = prompt("변경할 새로운 닉네임을 입력해 주세요:", name);
-  if (newName === null) return; // 취소 버튼을 누른 경우
-  const trimmed = newName.trim();
-  if (!trimmed) {
-    alert("올바른 닉네임을 입력해 주세요.");
-    return;
-  }
-  name = trimmed;
-  localStorage.setItem('chat_nickname', trimmed);
-  render();
-}
- 
-function listenToMessages() {
-  if (unsubscribe) unsubscribe();
-
-  const roomRef = ref(db, `rooms/${room}`);
-  
-  unsubscribe = onValue(roomRef, (snapshot) => {
-    const data = snapshot.val();
-    const msgs = data ? Object.values(data) : [];
-    msgs.sort((a, b) => a.ts - b.ts);
-    renderMessages(msgs);
-  }, (error) => {
-    console.error("데이터 구독 실패", error);
-    renderMessages([], true);
+// 유저 목록 불러오기 (1:1 채팅 생성)
+function loadUsers() {
+  unsubscribe = onValue(ref(db, 'users'), (snap) => {
+    const users = snap.val() || {};
+    const content = document.getElementById('lobby-content');
+    if (!content) return;
+    
+    let html = '';
+    Object.entries(users).forEach(([id, u]) => {
+      if (id === currentUser.id) return;
+      html += `
+        <div class="lc-item" onclick="window.startDirectChat('${id}', '${escapeHtml(u.name)}')">
+          <div class="lc-item-info">
+            <span class="lc-item-title">${escapeHtml(u.name)}</span>
+            <span class="lc-item-sub">${escapeHtml(u.status)}</span>
+          </div>
+          <span style="color:#8fd6c4; font-size:12px;">1:1 대화 ➔</span>
+        </div>`;
+    });
+    content.innerHTML = html || '<div class="lc-empty">다른 사용자가 없습니다.</div>';
   });
 }
- 
-function renderMessages(msgs, error) {
-  const el = document.getElementById('lc-msgs');
-  if (!el) return;
-  const wasAtBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 30;
-  if (error) {
-    el.innerHTML = '<div class="lc-error">데이터를 불러오지 못했습니다. 보안 규칙 설정을 확인해 주세요.</div>';
-    return;
-  }
-  if (!msgs.length) {
-    el.innerHTML = '<div class="lc-empty">아직 메시지가 없어요. 첫 대화를 시작해 보세요!</div>';
-    return;
-  }
-  el.innerHTML = msgs.map(m => `
-    <div class="lc-msg ${m.name === name ? 'me' : 'other'}">
-      <span class="lc-name">${escapeHtml(m.name)}</span>${escapeHtml(m.text)}
-    </div>`).join('');
-  if (wasAtBottom) el.scrollTop = el.scrollHeight;
+
+// 채팅방 목록 불러오기
+function loadRooms() {
+  unsubscribe = onValue(ref(db, 'rooms'), (snap) => {
+    const rooms = snap.val() || {};
+    const content = document.getElementById('lobby-content');
+    if (!content) return;
+    
+    let html = '';
+    Object.entries(rooms).forEach(([id, r]) => {
+      if (!r.meta || !r.meta.members || !r.meta.members[currentUser.id]) return;
+      
+      let title = r.meta.title;
+      if (r.meta.type === 'direct') {
+        const otherName = Object.values(r.meta.memberNames).find(name => name !== currentUser.name);
+        title = `${otherName || '알 수 없음'}님과의 대화`;
+      }
+      
+      html += `
+        <div class="lc-item" onclick="window.joinRoom('${id}')">
+          <div class="lc-item-info">
+            <span class="lc-item-title">${escapeHtml(title)}</span>
+            <span class="lc-item-sub">참여자 ${Object.keys(r.meta.members).length}명</span>
+          </div>
+        </div>`;
+    });
+    content.innerHTML = html || '<div class="lc-empty">참여 중인 채팅방이 없습니다.</div>';
+  });
 }
- 
-async function sendMsg() {
-  const input = document.getElementById('lc-input');
+
+// 1:1 채팅방 생성 또는 입장
+window.startDirectChat = async (targetId, targetName) => {
+  const roomsSnap = await get(ref(db, 'rooms'));
+  const rooms = roomsSnap.val() || {};
+  
+  for (const [id, r] of Object.entries(rooms)) {
+    if (r.meta && r.meta.type === 'direct' && r.meta.members[currentUser.id] && r.meta.members[targetId]) {
+      return window.joinRoom(id);
+    }
+  }
+  
+  const newRoomRef = push(ref(db, 'rooms'));
+  await set(newRoomRef, {
+    meta: {
+      type: 'direct',
+      createdAt: Date.now(),
+      members: { [currentUser.id]: true, [targetId]: true },
+      memberNames: { [currentUser.id]: currentUser.name, [targetId]: targetName }
+    }
+  });
+  window.joinRoom(newRoomRef.key);
+};
+
+// 단체 채팅방 생성
+async function createGroupRoom() {
+  const usersSnap = await get(ref(db, 'users'));
+  const users = usersSnap.val() || {};
+  
+  let userList = Object.entries(users).filter(([id]) => id !== currentUser.id);
+  if (userList.length === 0) return alert('초대할 사용자가 없습니다.');
+  
+  let promptText = '초대할 사람의 번호를 쉼표로 구분해 입력하세요:\n\n';
+  userList.forEach(([id, u], idx) => promptText += `${idx + 1}. ${u.name}\n`);
+  
+  const input = prompt(promptText);
+  if (!input) return;
+  
+  const indices = input.split(',').map(n => parseInt(n.trim()) - 1);
+  const members = { [currentUser.id]: true };
+  const memberNames = { [currentUser.id]: currentUser.name };
+  
+  indices.forEach(idx => {
+    if (userList[idx]) {
+      members[userList[idx][0]] = true;
+      memberNames[userList[idx][0]] = userList[idx][1].name;
+    }
+  });
+  
+  if (Object.keys(members).length < 2) return alert('최소 1명 이상 선택해야 합니다.');
+  
+  const title = prompt('단체 채팅방 이름을 입력하세요:', '즐거운 단체방') || '단체 채팅방';
+  const newRoomRef = push(ref(db, 'rooms'));
+  await set(newRoomRef, {
+    meta: { type: 'group', title, createdAt: Date.now(), members, memberNames }
+  });
+  window.joinRoom(newRoomRef.key);
+}
+
+// 3. 채팅방 화면 및 메시지 처리 (읽음 확인 + 3일 자동 삭제)
+window.joinRoom = async (roomId) => {
+  if (unsubscribe) { unsubscribe(); unsubscribe = null; }
+  activeRoomId = roomId;
+  
+  const metaSnap = await get(ref(db, `rooms/${roomId}/meta`));
+  activeRoomMeta = metaSnap.val();
+  
+  let displayTitle = activeRoomMeta.title;
+  if (activeRoomMeta.type === 'direct') {
+    const otherName = Object.values(activeRoomMeta.memberNames).find(name => name !== currentUser.name);
+    displayTitle = `${otherName}님과의 대화`;
+  }
+
+  app.innerHTML = `
+    <div class="lc-root">
+      <div class="lc-header">
+        <button class="lc-back-btn" id="btn-back"><span>◀</span> 나가기</button>
+        <span class="lc-title" style="font-size:14px;">${escapeHtml(displayTitle)}</span>
+        <span style="width:40px;"></span>
+      </div>
+      <div class="lc-msgs" id="chat-msgs"><div class="lc-empty">메시지를 불러오는 중...</div></div>
+      <div class="lc-composer">
+        <input class="lc-input" id="chat-input" placeholder="메시지 입력..." maxlength="500" />
+        <button class="lc-btn" id="chat-send">전송</button>
+      </div>
+    </div>`;
+    
+  document.getElementById('btn-back').onclick = renderLobby;
+  document.getElementById('chat-send').onclick = sendMessage;
+  document.getElementById('chat-input').addEventListener('keydown', e => { if (e.key === 'Enter') sendMessage(); });
+  
+  listenMessages();
+};
+
+function listenMessages() {
+  const msgsRef = ref(db, `rooms/${activeRoomId}/messages`);
+  const totalMembers = Object.keys(activeRoomMeta.members).length;
+  
+  unsubscribe = onValue(msgsRef, (snap) => {
+    const msgs = snap.val() || {};
+    const el = document.getElementById('chat-msgs');
+    if (!el) return;
+    
+    const now = Date.now();
+    let html = '';
+    const validMsgs = [];
+    
+    // 3일 지난 메시지 필터링 및 클라이언트 단 자동 삭제 로직
+    Object.entries(msgs).forEach(([msgId, m]) => {
+      if (now - m.ts > THREE_DAYS_MS) {
+        remove(ref(db, `rooms/${activeRoomId}/messages/${msgId}`)); // 3일 경과 시 DB 삭제
+      } else {
+        validMsgs.push({ id: msgId, ...m });
+      }
+    });
+    
+    validMsgs.sort((a, b) => a.ts - b.ts);
+    
+    if (validMsgs.length === 0) {
+      el.innerHTML = '<div class="lc-empty">대화 내역이 없습니다.</div>';
+      return;
+    }
+    
+    validMsgs.forEach(m => {
+      const isMe = m.senderId === currentUser.id;
+      
+      // 내가 읽지 않은 메시지라면 읽음 처리 업데이트
+      if (!m.readBy || !m.readBy[currentUser.id]) {
+        update(ref(db, `rooms/${activeRoomId}/messages/${m.id}/readBy`), { [currentUser.id]: Date.now() });
+      }
+      
+      // 안 읽은 사람 수 계산
+      const readCount = m.readBy ? Object.keys(m.readBy).length : 0;
+      const unreadCount = Math.max(0, totalMembers - readCount);
+      const unreadHtml = unreadCount > 0 ? `<span class="lc-unread">${unreadCount}</span>` : '';
+      
+      html += `
+        <div class="lc-msg-wrapper ${isMe ? 'me' : 'other'}">
+          ${!isMe ? `<span class="lc-name">${escapeHtml(m.senderName)}</span>` : ''}
+          <div class="lc-msg">${escapeHtml(m.text)}</div>
+          <div class="lc-meta">
+            ${unreadHtml}
+            <span>${formatTime(m.ts)}</span>
+          </div>
+        </div>`;
+    });
+    
+    const wasAtBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 40;
+    el.innerHTML = html;
+    if (wasAtBottom || validMsgs[validMsgs.length-1].senderId === currentUser.id) {
+      el.scrollTop = el.scrollHeight;
+    }
+  });
+}
+
+async function sendMessage() {
+  const input = document.getElementById('chat-input');
   const text = input.value.trim();
-  if (!text) return;
+  if (!text || !activeRoomId) return;
   input.value = '';
   
-  try {
-    const roomRef = ref(db, `rooms/${room}`);
-    const newMsgRef = push(roomRef);
-    
-    await set(newMsgRef, {
-      name: name,
-      text: text,
-      ts: Date.now()
-    });
-  } catch (e) {
-    console.error('전송 실패', e);
-  }
+  const newMsgRef = push(ref(db, `rooms/${activeRoomId}/messages`));
+  await set(newMsgRef, {
+    senderId: currentUser.id,
+    senderName: currentUser.name,
+    text: text,
+    ts: Date.now(),
+    readBy: { [currentUser.id]: Date.now() } // 보낸 사람은 즉시 읽음 처리
+  });
 }
- 
-render();
 </script>
 </body>
 </html>
